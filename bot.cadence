@@ -47,11 +47,23 @@ rulesets classic inertial-2d gravity-flat gravity-hills zero-g
 initial search
 
 state search
+  enter set dodges 0
+  enter set dodge-until 0
+  # A simple dodge: vary it, or predict the shooter. A muzzle cue heard this
+  # tick means a robot fired; for half a second swerve off the line of fire,
+  # left on odd dodges and right on even ones (side is positive left): turn
+  # at full drive, or strafe at half thrust under forces. listen and track
+  # dodge the same way.
+  each set dodges dodges + (tick >= dodge-until and cue-muzzle and cue-age == 0)
+  each set dodge-until max(dodge-until, (tick >= dodge-until and cue-muzzle and cue-age == 0) * (tick + 10))
+  each set dodging tick < dodge-until
+  each set side 1 - 2 * (dodges % 2 == 0)
   # Under a quarter battery, drive at half speed.
-  each drive 0.6 - 0.3 * (battery-fraction < 0.25)
-  each turn 0.25
+  each drive dodging * (1 - 0.5 * (battery-fraction < 0.25)) + (not dodging) * (0.6 - 0.3 * (battery-fraction < 0.25))
+  each turn dodging * side + (not dodging) * 0.25
   each pitch clamp(-pitch / 45, -1, 1)
-  each thrust 0.6 - 0.3 * (battery-fraction < 0.25)
+  each thrust dodging * 0.5 * (1 - 0.5 * (battery-fraction < 0.25)) + (not dodging) * (0.6 - 0.3 * (battery-fraction < 0.25))
+  each strafe -(dodging * side)
   each yaw-torque clamp(0.2 - yaw-rate / 60, -1, 1)
   each lift clamp(-gravity-z / 100 + gravity * (60 - altitude) / 100 - vz / 50, -1, 1)
   each pitch-torque clamp(-pitch / 40 - pitch-rate / 60, -1, 1)
@@ -73,10 +85,15 @@ end
 # head that way and sweep a narrow scan across it. It reaches further than
 # the medium scan, and the cue is no firing solution.
 state listen
-  each drive 0.6 - 0.3 * (battery-fraction < 0.25)
-  each turn clamp(angle(cue-bearing, heading) / 45, -1, 1)
+  each set dodges dodges + (tick >= dodge-until and cue-muzzle and cue-age == 0)
+  each set dodge-until max(dodge-until, (tick >= dodge-until and cue-muzzle and cue-age == 0) * (tick + 10))
+  each set dodging tick < dodge-until
+  each set side 1 - 2 * (dodges % 2 == 0)
+  each drive dodging * (1 - 0.5 * (battery-fraction < 0.25)) + (not dodging) * (0.6 - 0.3 * (battery-fraction < 0.25))
+  each turn dodging * side + (not dodging) * clamp(angle(cue-bearing, heading) / 45, -1, 1)
   each pitch clamp(-pitch / 45, -1, 1)
-  each thrust 0.6 - 0.3 * (battery-fraction < 0.25)
+  each thrust dodging * 0.5 * (1 - 0.5 * (battery-fraction < 0.25)) + (not dodging) * (0.6 - 0.3 * (battery-fraction < 0.25))
+  each strafe -(dodging * side)
   each yaw-torque clamp(angle(cue-bearing, heading) / 70 - yaw-rate / 60, -1, 1)
   each lift clamp(-gravity-z / 100 + gravity * (60 - altitude) / 100 - vz / 50, -1, 1)
   each pitch-torque clamp(-pitch / 40 - pitch-rate / 60, -1, 1)
@@ -122,10 +139,15 @@ end
 state track
   # Circle the target instead of driving straight at it: a robot crossing
   # the line of fire is harder to hit. Driving costs battery, so go gently.
-  each turn clamp(angle(bearing + 90 + wave(50, 30), heading) / 45, -1, 1)
   each pitch clamp(-pitch / 45, -1, 1)
-  each drive 0.5 - 0.25 * (battery-fraction < 0.25)
-  each thrust clamp((range - 200) / 180, -0.5, 0.6) * (1 - 0.5 * (battery-fraction < 0.25))
+  each set dodges dodges + (tick >= dodge-until and cue-muzzle and cue-age == 0)
+  each set dodge-until max(dodge-until, (tick >= dodge-until and cue-muzzle and cue-age == 0) * (tick + 10))
+  each set dodging tick < dodge-until
+  each set side 1 - 2 * (dodges % 2 == 0)
+  each turn dodging * side + (not dodging) * clamp(angle(bearing + 90 + wave(50, 30), heading) / 45, -1, 1)
+  each drive dodging * (1 - 0.5 * (battery-fraction < 0.25)) + (not dodging) * (0.5 - 0.25 * (battery-fraction < 0.25))
+  each thrust dodging * 0.5 * (1 - 0.5 * (battery-fraction < 0.25)) + (not dodging) * clamp((range - 200) / 180, -0.5, 0.6) * (1 - 0.5 * (battery-fraction < 0.25))
+  each strafe -(dodging * side)
   each yaw-torque clamp(angle(bearing, heading) / 70 - yaw-rate / 60, -1, 1)
   each lift clamp(-gravity-z / 100 + gravity * (60 - altitude) / 100 - vz / 50, -1, 1)
   each pitch-torque clamp(-pitch / 40 - pitch-rate / 60, -1, 1)
